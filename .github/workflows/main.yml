@@ -1,0 +1,67 @@
+name: Compilar instalador de Windows
+
+# Este flujo compila automáticamente el .exe y el instalador de Windows en
+# un runner de Windows de GitHub Actions. Es la forma recomendada de
+# obtener el instalador final si no tienes un PC con Windows a mano para
+# compilarlo tú mismo: solo hace falta subir este proyecto a un repositorio
+# de GitHub (puede ser privado) y este flujo se encarga del resto.
+#
+# Se dispara:
+#   - manualmente, desde la pestaña "Actions" de GitHub ("Run workflow")
+#   - automáticamente al crear una etiqueta de versión (ej. v1.0.0)
+#
+# El instalador final queda disponible para descargar como "artifact" de
+# la ejecución (pestaña Actions -> la ejecución -> Artifacts).
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - name: Descargar el código
+        uses: actions/checkout@v4
+
+      - name: Instalar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Instalar dependencias
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt -r requirements-dev.txt
+
+      - name: Generar assets (icono y sonidos)
+        run: python tools/generate_assets.py
+
+      - name: Ejecutar pruebas automatizadas
+        run: python -m pytest tests/ -v
+        env:
+          QT_QPA_PLATFORM: offscreen
+
+      - name: Compilar el ejecutable con PyInstaller
+        run: pyinstaller packaging/build.spec
+
+      - name: Instalar Inno Setup
+        run: choco install innosetup -y
+
+      - name: Compilar el instalador
+        run: |
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" packaging\installer.iss
+
+      - name: Publicar el instalador como artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: PosicionF1_25_Setup
+          path: packaging/Output/PosicionF1_25_Setup.exe
+
+      - name: Adjuntar a la Release (solo si el disparo fue una etiqueta v*)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: packaging/Output/PosicionF1_25_Setup.exe
