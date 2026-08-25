@@ -1,0 +1,10 @@
+venv/
+__pycache__/
+*.pyc
+*.pt
+*.ts
+data/raw_clips/*
+!data/raw_clips/.gitkeep
+output/*
+!output/.gitkeep
+reports/*.html
